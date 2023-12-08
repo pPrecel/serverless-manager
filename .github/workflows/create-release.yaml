@@ -1,6 +1,11 @@
 name: "Create release"
 
 on:
+  workflow_call:
+    inputs:
+      name:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       name:
@@ -17,6 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
           
       - name: Verify serverless manifest images
@@ -31,10 +37,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Check image
-        run: ./.github/scripts/check_image.sh ${{ github.event.inputs.name }}
+        run: ./.github/scripts/check_image.sh ${{ inputs.name }}
 
       - name: Verify prow post jobs
         run: ./.github/scripts/verify-serverless-status.sh ${{ github.ref_name }}
@@ -52,6 +59,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Create changelog
@@ -59,20 +67,20 @@ jobs:
         with:
           image: githubchangeloggenerator/github-changelog-generator
           options: -v ${{ github.workspace }}:/usr/local/src/your-app
-          run: github_changelog_generator -u kyma-project -p serverless -t ${{ secrets.GITHUB_TOKEN }} --enhancement-labels kind/feature,area/ci  --bug-labels kind/bug --future-release ${{ github.event.inputs.name }} --unreleased-only --no-author
+          run: github_changelog_generator -u kyma-project -p serverless -t ${{ secrets.GITHUB_TOKEN }} --enhancement-labels kind/feature,area/ci  --bug-labels kind/bug --future-release ${{ inputs.name }} --unreleased-only --no-author
 
       - name: Create draft release
         id: create-draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_ID=$(./.github/scripts/create_draft_release.sh ${{ github.event.inputs.name }})
+          RELEASE_ID=$(./.github/scripts/create_draft_release.sh ${{ inputs.name }})
           echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
 
       - name: Create lightweight tag
         run: |
-          git tag ${{ github.event.inputs.name }}
-          git push origin ${{ github.event.inputs.name }}
+          git tag ${{ inputs.name }}
+          git push origin ${{ inputs.name }}
 
       - name: Create release assets
         id: create-assets
@@ -96,6 +104,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
           
       - name: Publish release

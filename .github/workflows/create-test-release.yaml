@@ -1,0 +1,79 @@
+name: "Create test release"
+
+on:
+  workflow_dispatch:
+
+env:
+  BRANCH_NAME: "release-${{ github.actor_id }}"
+
+jobs:
+  verify-input:
+    name: Verify input data
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify `run workflow from`
+        run: |
+          if [[ ${{ github.ref_name }} == "main" ]]; then
+            echo "Can't run workflow for main branch"
+            exit 1
+          fi
+
+          echo OK
+
+  prepare-release-data:
+    name: Create test release
+    runs-on: ubuntu-latest
+    needs: verify-input
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup git
+        run: |
+          git config --local user.email "otter[bot]@otter.noreply.github.com"
+          git config --local user.name "otter[bot]"
+      
+      - name: Bump sec-scanners-config
+        run: |
+          sed -i 's/main/0.0.0/g' sec-scanners-config.yaml
+          
+          git add sec-scanners-config.yaml
+          git commit --allow-empty -m "bump sec-scanners-config"
+          git push origin ${{ github.ref_name }}
+
+      - name: Bump chart values
+        run: |
+          BRANCH_SHA=$(git rev-parse ${{ github.ref_name }})
+
+          sed -i -r "s/PR-[0-9]+/${BRANCH_SHA}/g" config/serverless/values.yaml
+          sed -i 's/"dev"/"prod"/g' config/serverless/values.yaml
+          
+          git add config/serverless/values.yaml
+          git commit --allow-empty -m "bump values.yaml"
+          git push origin ${{ github.ref_name }}
+
+  test-release:
+    name: Run release
+    needs: prepare-release-data
+    uses: ./.github/workflows/create-release.yaml
+    with:
+      name: "0.0.0"
+  
+  cleanup-test-release:
+    name: Cleanup test release
+    runs-on: ubuntu-latest
+
+    needs: test-release
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Remove release and tag
+        run: |
+          gh release delete --cleanup-tag --yes "0.0.0"
+        env:
+          GH_TOKEN: ${{ github.token }}
