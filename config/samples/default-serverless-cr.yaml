@@ -3,6 +3,8 @@ kind: Serverless
 metadata:
   name: default
   namespace: kyma-system
+  labels:
+    app: team-ir
 spec:
   dockerRegistry:
     enableInternal: true
